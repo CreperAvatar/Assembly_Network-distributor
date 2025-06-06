@@ -1,4 +1,4 @@
-.section .data
+////////.section .data
 sockaddr_in:
     .hword 2        // sin_family = AF_INET(IPv4)
     .hword 0x4300   // port number = 67
