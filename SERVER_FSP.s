@@ -1,3 +1,4 @@
+//MAREK JE PEKNY KUS KOKOTA
 .section .data
 sockaddr_in:
     .hword 2        // sin_family = AF_INET(IPv4)
