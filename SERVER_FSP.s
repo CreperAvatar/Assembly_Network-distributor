@@ -162,30 +162,40 @@ IP_TO_ASCII_CONVERSION:
 @ ---------------------------------------------------------
     mov r8, #0
     mov r11, #0
-    //mov r10, #0
+    mov r10, #0
+    mov r12, #'.'
     ldr r10, =tftp_name
     IP_NUM_CONVERSION:
-	cmp r8, #3
-	addls r8, r8, #1
-	addeq r11, r11, #1
-        ldrb r4, [r1, r8]     
+	//cmp r8, #3
+	//addls r8, r8, #1
+	//addeq r11, r11, #1
+        ldrb r4, [r1, r8]     //tu som si neni isty aky to ma vyznam presne
 
 @----------------------------------------------------------------------------------UNITS-OCTET-WRITE------------------------------------------------------------------------------
  
- 
+        //ZAPIS JEDNOTIEK POKIAL V OCTETE NIESU STOVKY ANI DESIATKY
         cmp r4, #10
         movlo r9, r4 
         addlo r9, r9, #0x30 //UNITS
-	cmp r11, #1
-        	
-        blo ASCII_CONVERSION
+        strlo r9, [r10, r11]
+        addlo r11, r11, #1 
+        bhs JUMP   //toto je kvoli tomu ze ked je cislo viac ako 10 ale zaroven sme octet napr. 2, tak by sa zapisala bodka ktoru nechceme tam mat, tak to skipne ten CMP pod tym
+        cmp r8, #3
+        strlo r12, [r10, r11]
+        addlo r11, r11, #1
+        blo IP_NUM_CONVERSION
+        bhs FORWARD_CONTINUE
 
+        JUMP:
 @-----------------------------------------------------------------------------ALL-HUNDREDS-SCENERIOS-FINISHED----------------------------------------------------------------------------------------       
 @---------------------------------------------------------------------------------HUNDREDS-OCTET-WRITE-----------------------------------------------------------------------------
         mov r2, #100
         udiv r3, r4, r2
         cmp r3, #1      //If there are hundreds, continue.
-        movhs r6, r3    // HOLD HUNDRED (if there are actually hundreds. Otherwise, go fuck your self..SKIP)             
+        movhs r6, r3    // HOLD HUNDRED (if there are actually hundreds. Otherwise, go fuck your self..SKIP) 
+        movhs r6, r6, #0x30
+        strhs r6, [r10, r11]
+        addhs r11, r11, #1            
         movhs r7, #0
         bhs IP_NUM_SUBS_LOOP_HUNDREDS
 
@@ -198,56 +208,80 @@ IP_TO_ASCII_CONVERSION:
 	        mov r2, #10
 	        udiv r3, r4, r2
 	        mov r7, r3
+            add r7, r7, #0x30
+            str r7, [r10, r11]
+            add r11, r11, #1
 
             SPLIT_TENTHS_UNITS:
-                mul r0, r3, r2
-                sub r1, r4, r0
-                sub r5, r4, r2
-
-                cmp r5, #0
-		movhs r9, r5
-	
-	
-
-
-	    
+                sub r3, r4, r2
+                cmp r3, #10
+                bhs SPLIT_TENTHS_UNITS
+                mov r9, r3
+                add r9, r9, #0x30
+                str r9, [r10, r11]
+                add r11, r11, #1
+                cmp r8, #3
+                strlo r12, [r10, r11]
+                addlo r11, r11, #1
+                blo IP_NUM_CONVERSION
+                bhs FORWARD_CONTINUE
 
         
         //BUDE TO KONTROLOVAT TO ZE KED NA STOVKACH JE NULA TAK BUDE KONTROLVAT ZE CI JE AJ NA DESIATKACH A JEDNOTKACH.
 @---------------------------------------------------------------HUNDREDS-CONTROL-OF-OCTET
         IP_NUM_SUBS_LOOP_HUNDREDS:                              //If hundreds exist only
             sub r5, r4, r2      //Holds substracted value of value which is stored in  r4
-            cmp r5, #100        //
+            cmp r5, #100        
             bhs IP_NUM_SUBS_LOOP_HUNDREDS
 
 
-            cmp r5, #0      //(100 - 100 | 200 - 100) loop = 0
+            cmp r5, #0      //(100 - 100 | 200 - 100) loop = 0  --------------------  KONTROLA CI NA DESIATKACH JE NULA
             moveq r7, r5
 
             
 
-            cmp r5, #10
+            cmp r5, #10                    //ZAPIS JEDNOTIEK POKIAL NA DESIATKE JE NULA (TAKISTO SA ZAPISU DESIATKY = 0)
+            addlo r7, r7, #0x30
+            strlo r7, [r10, r11]
+            addlo r11, r11, #1
             movlo r9, r5
+            addlo r9, r9, #0x30
+            strlo r9, [r10, r11]
+            addlo r11, r11, #1
+            bhs TAKE_OUT_TENTH
+            cmp r8, #3
+            strlo r12, [r10, r11]
+            addlo r11, r11, #1
+            addlo r8, #1
+            blo IP_NUM_CONVERSION
+            bhs FORWARD_CONTINUE
 
 
-            blo FORWARD_CONTINUE 
-            bhs TAKE_OUT_TENTH 
-            TAKE_OUT_TENTH:
+            TAKE_OUT_TENTH:             //ZAPIS DESIATOK POKIAL TAM NIE JE NULA
                 mov r2, #10
                 udiv r3, r5, r2     //Holds second digit of byte
-                mov r7, r3           //Holds tenth        
-            IP_NUM_SUBS_LOOP_TENTH:
+                mov r7, r3           //Holds tenth 
+                str r7, [r10, r11]
+                add r11, r11, #1       
+            IP_NUM_SUBS_LOOP_TENTH:     //NASLEDNY ZAPIS JEDNOTIEK (POKIAL NA DESIATKACH NIE JE NULA)
                     sub r3, r5, r2
                     cmp r3, #10
                     bhs IP_NUM_SUBS_LOOP_TENTH
                     mov r9, r3
+                    str r9, [r10, r11]
+                    add r11, r11, #1
+                    cmp r8, #3 
+                    strlo r12, [r10, r11]
+                    addlo r11, r11, #1
+                    blo IP_NUM_CONVERSION
+                    bhs FORWARD_CONTINUE
             FORWARD_CONTINUE:
 
 
        
 
 
-
+              //ASCII_CONVERSION nie je potrebny momentalne ale neham ho tu zatial (vsetko sa teda zapisuje uz v tom IP_NUM_CONVERSION)
         ASCII_CONVERSION:
         ldr r0, =tftp_name       //ASCII VERSION OF IP ADDRESS
         mov r12, #'.'
