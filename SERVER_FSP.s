@@ -166,23 +166,26 @@ IP_TO_ASCII_CONVERSION:
     mov r12, #'.'
     ldr r10, =tftp_name
     IP_NUM_CONVERSION:
-	//cmp r8, #3
-	//addls r8, r8, #1
-	//addeq r11, r11, #1
+
         ldrb r4, [r1, r8]     //tu som si neni isty aky to ma vyznam presne
 
+	    
 @----------------------------------------------------------------------------------UNITS-OCTET-WRITE------------------------------------------------------------------------------
  
         //ZAPIS JEDNOTIEK POKIAL V OCTETE NIESU STOVKY ANI DESIATKY
         cmp r4, #10
+
         movlo r9, r4 
         addlo r9, r9, #0x30 //UNITS
         strlo r9, [r10, r11]
         addlo r11, r11, #1 
+
         bhs JUMP   //toto je kvoli tomu ze ked je cislo viac ako 10 ale zaroven sme octet napr. 2, tak by sa zapisala bodka ktoru nechceme tam mat, tak to skipne ten CMP pod tym
+    
         cmp r8, #3
         strlo r12, [r10, r11]
         addlo r11, r11, #1
+        addlo r8, r8, #1
         blo IP_NUM_CONVERSION
         bhs FORWARD_CONTINUE
 
@@ -193,7 +196,7 @@ IP_TO_ASCII_CONVERSION:
         udiv r3, r4, r2
         cmp r3, #1      //If there are hundreds, continue.
         movhs r6, r3    // HOLD HUNDRED (if there are actually hundreds. Otherwise, go fuck your self..SKIP) 
-        movhs r6, r6, #0x30
+        movhs r6, r6, #0x30     //ASCII OFFSET
         strhs r6, [r10, r11]
         addhs r11, r11, #1            
         movhs r7, #0
@@ -223,6 +226,7 @@ IP_TO_ASCII_CONVERSION:
                 cmp r8, #3
                 strlo r12, [r10, r11]
                 addlo r11, r11, #1
+                addlo r8, r8, #1
                 blo IP_NUM_CONVERSION
                 bhs FORWARD_CONTINUE
 
@@ -252,7 +256,7 @@ IP_TO_ASCII_CONVERSION:
             cmp r8, #3
             strlo r12, [r10, r11]
             addlo r11, r11, #1
-            addlo r8, #1
+            addlo r8, r8, #1
             blo IP_NUM_CONVERSION
             bhs FORWARD_CONTINUE
 
@@ -273,6 +277,7 @@ IP_TO_ASCII_CONVERSION:
                     cmp r8, #3 
                     strlo r12, [r10, r11]
                     addlo r11, r11, #1
+                    addlo r8, r8, #1
                     blo IP_NUM_CONVERSION
                     bhs FORWARD_CONTINUE
             FORWARD_CONTINUE:
