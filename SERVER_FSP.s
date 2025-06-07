@@ -286,27 +286,6 @@ IP_TO_ASCII_CONVERSION:
        
 
 
-              //ASCII_CONVERSION nie je potrebny momentalne ale neham ho tu zatial (vsetko sa teda zapisuje uz v tom IP_NUM_CONVERSION)
-        ASCII_CONVERSION:
-        ldr r0, =tftp_name       //ASCII VERSION OF IP ADDRESS
-        mov r12, #'.'
-
-        add r6, r6, #0x30   //HUNDREDS
-        add r7, r7, #0x30   //TENTH
-        add r9, r9, #0x30   //UNITS
-
-        //cmp r10, #0
-
-
-        strb r6, [r0, r11] // 0
-        add r11, r11, #1        
-        strb r7, [r0, r11] // 1       
-        add r11, r11, #1        
-        strb r9, [r0, r11] // 2        
-        add r11, r11, #1
-        
-        strb r12, [r0, r11] //4
-        add r11, r11, #1
 
 @ --------------------------------------------------------
 
