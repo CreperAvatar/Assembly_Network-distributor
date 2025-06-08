@@ -38,43 +38,10 @@ _start:
     // Create socket
     mov r0, #2
     mov r1, #2
-    mov r2, #17
+    mov r2, #0
     mov r7, #281
     svc #0
     mov r6, r0
-
-    // Bind socket
-    mov r0, r6              //File descriptor of socket
-    ldr r1, =sockaddr_in    //Pointer to address of structure sockaddr_in
-    mov r2, #16             //Size of sockaddr_in structure (16 bytes)
-    mov r7, #282            //Number of syscall
-    svc #0
-
-LISTEN_LOOP:
-    // recvfrom
-    mov r0, r6
-    ldr r1, =recv_buffer
-    mov r2, #1024
-    mov r3, #0
-    ldr r4, =src_addr
-    ldr r5, =src_addr_len
-    mov r7, #292
-    svc #0
-    
-    ldr r0, =recv_buffer
-    add r0, r0, #28
-    ldr r1, =mac_buffer
-
-    mov r2, #0          // Byte offset
-
-COPY_MAC_LOOP:
-    ldrb r3, [r0, r2]
-    strb r3, [r1, r2]
-    add r2, r2, #1      // Load first,second,etc byte from recv_buffer and then save it into mac_buffer 
-    cmp r2, #6          // If we haven't done 6th byte then jump back to copy_mac_loop, otherwise continue.
-    bne COPY_MAC_LOOP
-
-
 
 GET_IP_ADDRESS:
     INICIALIZATION:
@@ -90,7 +57,7 @@ GET_IP_ADDRESS:
     IP_SYSCALL:
         @ Perform ioctl (SIOCGIFADDR)
         mov r0, r6                  @ Socket file descriptor
-        ldr r1, =ioctl_cmd             @ IOCTL command SIOCGIFADDR
+        mov r1, #0x8915             @ IOCTL command SIOCGIFADDR
         ldr r2, =ifreq              @ struct ifreq buffer
         mov r7, #54                 @ ioctl syscall
         svc #0      
@@ -101,63 +68,45 @@ GET_IP_ADDRESS:
         ldr r3, [r0]        @ Save IP address acquired in r0 register to the r3 register
 
         ldr r0, =ip_addr    @ Inserting address of ip_addr into r0 register
-// R0 HOLDS THE BINARY VERSION OF eth0 IP ADDRESS.                       
+        str r3, [r0]
+// R0 HOLDS THE BINARY VERSION OF eth0 IP ADDRESS.     
+LISTEN_LOOP:
 
-mov r8, #0
-mov r12, #0
-IP_OCTET_SIZE:
-    mov r3, #100
-    ldrb r1, [r0, r8]
-    add r8, r8, #1
-    udiv r2, r1, r3
+    // Bind socket
+    mov r0, r6              //File descriptor of socket
+    ldr r1, =sockaddr_in    //Pointer to address of structure sockaddr_in
+    mov r2, #16             //Size of sockaddr_in structure (16 bytes)
+    mov r7, #282            //Number of syscall
+    svc #0
 
-    cmp r2, #1
-    movhs r9, #3
-    bhs STORE_HUNDREDS_OCTET_SIZE
+    // recvfrom
+    mov r0, r6
+    ldr r1, =recv_buffer
+    mov r2, #1024
+    mov r3, #0
+    ldr r4, =src_addr
+    ldr r5, =src_addr_len
+    mov r7, #292
+    svc #0
+    
+    ldr r0, =recv_buffer
+    add r0, r0, #28
+    ldr r1, =mac_buffer
 
-    cmp r2, #0
-    beq TENTH
-
-    TENTH:
-    mov r3, #10
-    udiv r2, r1, r3
-
-    cmp r2, #1
-    movhs r10, #2
-
-    cmp r2, #0
-    movhs r11, #1       //Units
-    //Potom uloz tie data(cisla) o octetoch do bufferov. Nemame dost registrov bro.
-    ldr r4, =ip_octet
-
-    STORE_HUNDREDS_OCTET_SIZE:
-    strb r9, [r4, r12]
-    add r12, r12, #1
-    b IP_OCTET_SIZE
-
-    STORE_TENTH_OCTET_SIZE:
-    strb r10, [r4, r12]
-    add r12, r12, #1
-    b IP_OCTET_SIZE
-
-    STORE_UNITS_OCTET_SIZE:
-    strb r11, [r4, r12]
-    add r12, r12, #1
-    b IP_OCTET_SIZE
-
-
-
+    mov r2, #0          // Byte offset
+    
+COPY_MAC_LOOP:
+    ldrb r3, [r0, r2]
+    strb r3, [r1, r2]
+    add r2, r2, #1      // Load first,second,etc byte from recv_buffer and then save it into mac_buffer 
+    cmp r2, #6          // If we haven't done 6th byte then jump back to copy_mac_loop, otherwise continue.
+    bne COPY_MAC_LOOP
+         
 
 mov r8, #0
 IP_TO_ASCII_CONVERSION:
-    ldr r1, =ip_to_ascii
+    ldr r1, =ip_addr
 
-    GET_BYTE_LOOP:
-        ldrb r2, [r0, r8]       // Load to the register r2 first, second, etc byte of IP address
-        strb r2, [r1, r8]
-        add r8, r8, #1
-        cmp r8, #4
-        bne GET_BYTE_LOOP
 
 @ ---------------------------------------------------------
     mov r8, #0
@@ -177,15 +126,16 @@ IP_TO_ASCII_CONVERSION:
 
         movlo r9, r4 
         addlo r9, r9, #0x30 //UNITS
-        strlo r9, [r10, r11]
+        bllo store_units
         addlo r11, r11, #1 
 
         bhs JUMP   //toto je kvoli tomu ze ked je cislo viac ako 10 ale zaroven sme octet napr. 2, tak by sa zapisala bodka ktoru nechceme tam mat, tak to skipne ten CMP pod tym
     
         cmp r8, #3
-        strlo r12, [r10, r11]
+        bllo store_dots
         addlo r11, r11, #1
         addlo r8, r8, #1
+
         blo IP_NUM_CONVERSION
         bhs FORWARD_CONTINUE
 
@@ -194,12 +144,14 @@ IP_TO_ASCII_CONVERSION:
 @---------------------------------------------------------------------------------HUNDREDS-OCTET-WRITE-----------------------------------------------------------------------------
         mov r2, #100
         udiv r3, r4, r2
+
         cmp r3, #1      //If there are hundreds, continue.
         movhs r6, r3    // HOLD HUNDRED (if there are actually hundreds. Otherwise, go fuck your self..SKIP) 
-        movhs r6, r6, #0x30     //ASCII OFFSET
-        strhs r6, [r10, r11]
+        addhs r6, r6, #0x30     //ASCII OFFSET
+        blhs store_hundreds
         addhs r11, r11, #1            
         movhs r7, #0
+
         bhs IP_NUM_SUBS_LOOP_HUNDREDS
 
 
@@ -212,19 +164,19 @@ IP_TO_ASCII_CONVERSION:
 	        udiv r3, r4, r2
 	        mov r7, r3
             add r7, r7, #0x30
-            str r7, [r10, r11]
+            strb r7, [r10, r11]
             add r11, r11, #1
 
             SPLIT_TENTHS_UNITS:
                 sub r3, r4, r2
                 cmp r3, #10
                 bhs SPLIT_TENTHS_UNITS
-                mov r9, r3
-                add r9, r9, #0x30
-                str r9, [r10, r11]
-                add r11, r11, #1
+                movlo r9, r3
+                addlo r9, r9, #0x30
+                bllo store_units
+                addlo r11, r11, #1
                 cmp r8, #3
-                strlo r12, [r10, r11]
+                bllo store_dots
                 addlo r11, r11, #1
                 addlo r8, r8, #1
                 blo IP_NUM_CONVERSION
@@ -246,15 +198,19 @@ IP_TO_ASCII_CONVERSION:
 
             cmp r5, #10                    //ZAPIS JEDNOTIEK POKIAL NA DESIATKE JE NULA (TAKISTO SA ZAPISU DESIATKY = 0)
             addlo r7, r7, #0x30
-            strlo r7, [r10, r11]
+            bllo store_tenths
             addlo r11, r11, #1
+
             movlo r9, r5
             addlo r9, r9, #0x30
-            strlo r9, [r10, r11]
+            bllo store_units
+
             addlo r11, r11, #1
+
             bhs TAKE_OUT_TENTH
+
             cmp r8, #3
-            strlo r12, [r10, r11]
+            bllo store_dots
             addlo r11, r11, #1
             addlo r8, r8, #1
             blo IP_NUM_CONVERSION
@@ -265,33 +221,41 @@ IP_TO_ASCII_CONVERSION:
                 mov r2, #10
                 udiv r3, r5, r2     //Holds second digit of byte
                 mov r7, r3           //Holds tenth 
-                str r7, [r10, r11]
+                bl store_tenths
                 add r11, r11, #1       
-            IP_NUM_SUBS_LOOP_TENTH:     //NASLEDNY ZAPIS JEDNOTIEK (POKIAL NA DESIATKACH NIE JE NULA)
-                    sub r3, r5, r2
-                    cmp r3, #10
-                    bhs IP_NUM_SUBS_LOOP_TENTH
-                    mov r9, r3
-                    str r9, [r10, r11]
-                    add r11, r11, #1
-                    cmp r8, #3 
-                    strlo r12, [r10, r11]
-                    addlo r11, r11, #1
-                    addlo r8, r8, #1
-                    blo IP_NUM_CONVERSION
-                    bhs FORWARD_CONTINUE
-            FORWARD_CONTINUE:
+                IP_NUM_SUBS_LOOP_TENTH:     //NASLEDNY ZAPIS JEDNOTIEK (POKIAL NA DESIATKACH NIE JE NULA)
+                        sub r3, r5, r2
+                        cmp r3, #10
+                        bhs IP_NUM_SUBS_LOOP_TENTH
+                        movlo r9, r3
+                        bllo store_units
+                        addlo r11, r11, #1
+                        cmp r8, #3 
+                        bllo store_dots
+                        addlo r11, r11, #1
+                        addlo r8, r8, #1
+                        blo IP_NUM_CONVERSION
+                        bhs FORWARD_CONTINUE
+b FORWARD_CONTINUE
+@ ----------------------------------------------------------------------
+store_units:
+    strb r9, [r10, r11]
+    bx lr
+store_hundreds:
+    strb r6, [r10, r11]
+    bx lr
+store_tenths:
+    strb r7, [r10, r11]
+    bx lr
+store_dots:
+    strb r12, [r10, r11]
+    bx lr     
 
 
-       
 
+@ ----------------------------------------------------------------------
+FORWARD_CONTINUE:
 
-
-@ --------------------------------------------------------
-
-
-
-//                              DHCP OFFEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEER
 GET_DISCOVERY_ATTRIBUTES:
     ldr r0, =recv_buffer
     add r0, r0, #4  //Transaction ID
@@ -360,6 +324,13 @@ DHCP_OFFER:
     str r1, [r0], #4
 
     //  ---- Option 66: TFTP server name
+
+
+mov r0, #1
+ldr r1, =tftp_name
+mov r2, #14
+mov r7, #4
+SVC #0
 
 END:
     mov r7, #1
