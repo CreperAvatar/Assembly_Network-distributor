@@ -94,14 +94,7 @@ LISTEN_LOOP:
     ldr r1, =mac_buffer
 
     mov r2, #0          // Byte offset
-    
-COPY_MAC_LOOP:
-    ldrb r3, [r0, r2]
-    strb r3, [r1, r2]
-    add r2, r2, #1      // Load first,second,etc byte from recv_buffer and then save it into mac_buffer 
-    cmp r2, #6          // If we haven't done 6th byte then jump back to copy_mac_loop, otherwise continue.
-    bne COPY_MAC_LOOP
-         
+            
 
 mov r8, #0
 IP_TO_ASCII_CONVERSION:
@@ -115,7 +108,7 @@ IP_TO_ASCII_CONVERSION:
     mov r12, #'.'
     ldr r10, =tftp_name
     IP_NUM_CONVERSION:
-
+        
         ldrb r4, [r1, r8]     //tu som si neni isty aky to ma vyznam presne
 
 	    
