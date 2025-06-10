@@ -62,11 +62,6 @@ GET_IP_ADDRESS:
         svc #0      
 
         ldr r0, =ifreq      @ Saves address of buffer ifreq into register r0
-        add r0, r0, #16     @ Set location into ifreq buffer 16 bytes further 
-        ldr r3, [r0]        @ Save IP address acquired in r0 register to the r3 register
-
-        ldr r0, =ip_addr    @ Inserting address of ip_addr into r0 register
-        str r3, [r0]
 // R0 HOLDS THE BINARY VERSION OF eth0 IP ADDRESS.   
 
 
@@ -181,20 +176,27 @@ IP_TO_ASCII_CONVERSION:
     svc #0
 
 GET_DISCOVERY_ATTRIBUTES:
+    mov r8, #0
+    ldr r1, =mac_buffer
     ldr r0, =recv_buffer
-    add r0, r0, #4  //Transaction ID
 
+    add r0, r0, #4  //Transaction ID
     ldr r2, [r0]
 
-    ldr r0, =recv_buffer
-    add r0, r0, #8  //secs
+    add r0, r0, #4  //secs
+    ldrh r3, [r0]
 
-    ldr r3, [r0]
-
-    ldr r0, =recv_buffer
-    add r0, r0, #10 //flags
-
+    add r0, r0, #2 //flags
     ldr r5, [r0]
+
+    add r0, r0, #18 //MAC
+    ldr r6, [r0]
+
+    GET_BYTE_LOOP:
+        strb r6, [r1, r8]
+        add r8, r8, #1
+        cmp r8, #6
+        bne GET_BYTE_LOOP
 
 DHCP_OFFER:
     ldr r0, =dhcp_offer_packet
@@ -239,7 +241,7 @@ DHCP_OFFER:
     strb r1, [r0, #44]  // sname - Optional server host name
 
     ldr r1, =bootfile_name
-    strb r1, [r0, #108]  // file - Boot file name
+    str r1, [r0, #108]  // file - Boot file name
 //Options are located at offset 236
     add r0, r0, #236
     @ ---- MAGIC COOKIE (0x63 0x82 0x53 0x63) ---- @ 
@@ -248,6 +250,7 @@ DHCP_OFFER:
     str r1, [r0], #4
 
     //  ---- Option 66: TFTP server name
+    
     
 END:
     mov r7, #1
