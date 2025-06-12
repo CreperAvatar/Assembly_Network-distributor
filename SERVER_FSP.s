@@ -33,225 +33,273 @@ src_addr_len: .word 16
 .section .text
 .global _start
 
-_start:
-    // Create socket
-    mov r0, #2
-    mov r1, #2
-    mov r2, #0
-    mov r7, #281
-    svc #0
-    mov r6, r0
+HEAD:
+    _start:
+        // Create socket
+        mov r0, #2
+        mov r1, #2
+        mov r2, #0
+        mov r7, #281
+        svc #0
+        mov r6, r0
 
-GET_IP_ADDRESS:
-    INICIALIZATION:
-        ldr r1, =ifreq
-        ldr r2, =interface_name
-        mov r3, #5                  @ Copy 5 bytes ("eth0\0")
-    LOOP_IP_GET:
-        ldrb r5, [r2], #1           @ Load byte from interface_name
-        strb r5, [r1], #1           @ Store in ifreq
-        subs r3, r3, #1      
-        cmp r3, #0       
-        bne LOOP_IP_GET
-    IP_SYSCALL:
-        @ Perform ioctl (SIOCGIFADDR)
-        mov r0, r6                  @ Socket file descriptor
-        mov r1, #0x8915             @ IOCTL command SIOCGIFADDR
-        ldr r2, =ifreq              @ struct ifreq buffer
-        mov r7, #54                 @ ioctl syscall
-        svc #0      
+    GET_IP_ADDRESS:
+        INICIALIZATION:
+            ldr r1, =ifreq
+            ldr r2, =interface_name
+            mov r3, #5                  @ Copy 5 bytes ("eth0\0")
+        LOOP_IP_GET:
+            ldrb r5, [r2], #1           @ Load byte from interface_name
+            strb r5, [r1], #1           @ Store in ifreq
+            subs r3, r3, #1      
+            cmp r3, #0       
+            bne LOOP_IP_GET
+        IP_SYSCALL:
+            @ Perform ioctl (SIOCGIFADDR)
+            mov r0, r6                  @ Socket file descriptor
+            mov r1, #0x8915             @ IOCTL command SIOCGIFADDR
+            ldr r2, =ifreq              @ struct ifreq buffer
+            mov r7, #54                 @ ioctl syscall
+            svc #0      
 
-        ldr r0, =ifreq      @ Saves address of buffer ifreq into register r0
-// R0 HOLDS THE BINARY VERSION OF eth0 IP ADDRESS.   
-
-
+            ldr r0, =ifreq      @ Saves address of buffer ifreq into register r0
+        // R0 HOLDS THE BINARY VERSION OF eth0 IP ADDRESS.   
 
 
-mov r0, #0
-mov r3, #0
-mov r4, #0
-mov r6, #0
-mov r7, #0
-mov r8, #0
-mov r9, #0
-mov r10, #0
-mov r11, #0
-mov r12, #'.'
+    LISTEN_LOOP:
 
-IP_TO_ASCII_CONVERSION:
+        // Bind socket
+        mov r0, r6              //File descriptor of socket
+        ldr r1, =sockaddr_in    //Pointer to address of structure sockaddr_in
+        mov r2, #16             //Size of sockaddr_in structure (16 bytes)
+        mov r7, #282            //Number of syscall
+        svc #0
 
-    IP_NUM_CONVERSION:
-        ldr r0, =ifreq
-        add r0, r0, #20
-        ldrb r3, [r0, r8]          @ r1 = oktet
+        // recvfrom
+        mov r0, r6
+        ldr r1, =recv_buffer
+        mov r2, #1024
+        mov r3, #0
+        ldr r4, =src_addr
+        ldr r5, =src_addr_len
+        mov r7, #292
+        svc #0
+    
+        ldr r0, =recv_buffer
+        add r0, r0, #28
+        ldr r1, =mac_buffer
+mov r13, r6
 
-        mov r4, r3
-        HUNDREDS:
-            cmp r4, #100
-            blt TENTHS
 
-            sub r4, r4, #100
-            add r6, r6, #1
+BODY:
+    IP_TO_ASCII_CONVERSION:
 
-            b HUNDREDS
+        mov r8, #0
+        mov r12, #'.'
+        IP_NUM_CONVERSION:
+            mov r6, #0
+            mov r7, #0
+            mov r9, #0  
 
-            TENTHS:
-                cmp r4, #10
-                blt UNITS
+            ldr r0, =ifreq
+            add r0, r0, #20
+            ldrb r3, [r0, r8]          @ r1 = oktet
 
-                sub r4, r4, #10
-                add r7, r7, #1
+            mov r4, r3
+            HUNDREDS:
+                cmp r4, #100
+                blt TENTHS
 
-                b TENTHS
+                sub r4, r4, #100
+                add r6, r6, #1
 
-                UNITS:
+                b HUNDREDS
+
+                TENTHS:
                     cmp r4, #10
-                    movlo r9, r4
-                    b WRITE
+                    blt UNITS
 
-        WRITE:
-            ldr r10, =tftp_name
+                    sub r4, r4, #10
+                    add r7, r7, #1
 
-            WRITE_HUNDREDS:
-                cmp r6, #1
-                blt WRITE_TENTHS_SECTION
+                    b TENTHS
 
-                add r6, r6, #0x30
-                strb r6, [r10, r11]
-                add r11, r11, #1
+                    UNITS:
+                        cmp r4, #10
+                        movlo r9, r4
+                        b WRITE
 
-            WRITE_TENTHS_SECTION:
-                cmp r6, #1
-                bhs WRITE_TENTHS_SEMI
-                blt WRITE_TENTHS_FINAL
+            WRITE:
+                ldr r10, =tftp_name
 
-            WRITE_TENTHS_SEMI:
-                cmp r7, #0
-                beq WRITE_TENTH_ZERO_FINAL
-                bhi WRITE_TENTHS_FINAL
-            WRITE_TENTH_ZERO_FINAL:
-                addeq r7, r7, #0x30
-                strb r7, [r10, r11]
-                add r11, r11, #1
+                WRITE_HUNDREDS:
+                    cmp r6, #1
+                    blt WRITE_TENTHS_SECTION
 
-                mov r7, #0
-                b WRITE_UNITS
-            WRITE_TENTHS_FINAL:
-                cmp r7, #1
-                blt WRITE_UNITS
+                    add r6, r6, #0x30
+                    strb r6, [r10, r11]
+                    add r11, r11, #1
 
-                add r7, r7, #0x30
-                strb r7, [r10, r11]
-                add r11, r11, #1
+                WRITE_TENTHS_SECTION:
+                    cmp r6, #1
+                    bhs WRITE_TENTHS_SEMI
+                    blt WRITE_TENTHS_FINAL
 
-                mov r7, #0    
+                WRITE_TENTHS_SEMI:
+                    cmp r7, #0
+                    beq WRITE_TENTH_ZERO_FINAL
+                    bhi WRITE_TENTHS_FINAL
+                WRITE_TENTH_ZERO_FINAL:
+                    addeq r7, r7, #0x30
+                    strb r7, [r10, r11]
+                    add r11, r11, #1
 
-            WRITE_UNITS:
-                add r9, r9, #0x30
-                strb r9, [r10, r11]
-                add r11, r11, #1
-                
-                mov r9, #0
-                mov r6, #0
+                    b WRITE_UNITS
+                WRITE_TENTHS_FINAL:
+                    cmp r7, #1
+                    blt WRITE_UNITS
+
+                    add r7, r7, #0x30
+                    strb r7, [r10, r11]
+                    add r11, r11, #1
+  
+
+                WRITE_UNITS:
+                    add r9, r9, #0x30
+                    strb r9, [r10, r11]
+                    add r11, r11, #1
 
             
-            cmp r8, #3
-            addlt r8, r8, #1
-            bllt WRITE_DOT
-            blt IP_NUM_CONVERSION
-            b SKIP
-    WRITE_DOT:
-        ldr r10, =tftp_name
+                cmp r8, #3
+                addlt r8, r8, #1
+                bllt WRITE_DOT
+                blt IP_NUM_CONVERSION
+                b SKIP
+        WRITE_DOT:
+            ldr r10, =tftp_name
 
-        strb r12, [r10, r11]
-        add r11, r11, #1
-        bx lr
+            strb r12, [r10, r11]
+            add r11, r11, #1
+            bx lr
 
-    SKIP:
+        SKIP:
 
-    mov r0, #1
-    ldr r1, =tftp_name
-    mov r2, r11         
-    mov r7, #4
-    svc #0
+        mov r0, #1
+        ldr r1, =tftp_name
+        mov r2, r11         
+        mov r7, #4
+        svc #0
 
-GET_DISCOVERY_ATTRIBUTES:
-    mov r8, #0
-    ldr r1, =mac_buffer
-    ldr r0, =recv_buffer
+LEGS:
+    GET_DISCOVERY_ATTRIBUTES:
+        mov r8, #0
+        ldr r1, =mac_buffer
+        ldr r0, =recv_buffer
 
-    add r0, r0, #4  //Transaction ID
-    ldr r2, [r0]
+        add r0, r0, #4  //Transaction ID
+        ldrh r2, [r0]
 
-    add r0, r0, #4  //secs
-    ldrh r3, [r0]
+        add r0, r0, #4  //secs
+        ldrh r3, [r0]
 
-    add r0, r0, #2 //flags
-    ldr r5, [r0]
+        add r0, r0, #2 //flags
+        ldr r5, [r0]
 
-    add r0, r0, #18 //MAC
-    ldr r6, [r0]
+        add r0, r0, #18 //MAC
+        ldr r6, [r0]
 
-    GET_BYTE_LOOP:
-        strb r6, [r1, r8]
-        add r8, r8, #1
-        cmp r8, #6
-        bne GET_BYTE_LOOP
+        GET_BYTE_LOOP:
+            strb r6, [r1, r8]
+            add r8, r8, #1
+            cmp r8, #6
+            bne GET_BYTE_LOOP
 
-DHCP_OFFER:
-    ldr r0, =dhcp_offer_packet
+    DHCP_OFFER:
+        ldr r0, =dhcp_offer_packet
 
-    mov r1, #2  // BOOT REPLY
-    strb r1, [r0, #0]
+        mov r1, #2  // BOOT REPLY
+        strb r1, [r0, #0]
 
-    mov r1, #1
-    strb r1, [r0, #1]
+        mov r1, #1
+        strb r1, [r0, #1]
 
-    mov r1, #6
-    strb r1, [r0, #2]
+        mov r1, #6
+        strb r1, [r0, #2]
     
-    mov r1, #0
-    strb r1, [r0, #3]
+        mov r1, #0
+        strb r1, [r0, #3]
 
-    mov r1, r2     // Transaction ID must be extracted from DHCP discover packet
-    str r1, [r0, #4]
+        mov r1, r2     // Transaction ID must be extracted from DHCP discover packet
+        strh r1, [r0, #4]
 
-    mov r1, r3     // Secs - must be extracted from DHCP discover packet
-    strb r1, [r0, #8]
+        mov r1, r3     // Secs - must be extracted from DHCP discover packet
+        strh r1, [r0, #8]
 
-    mov r1, r5          // flags  -  1 == broadcast(Client doesn't have IP address), 0 == unicast(Client does have IP address)
-    strb r1, [r0, #10]  
+        mov r1, r5          // flags  -  1 == broadcast(Client doesn't have IP address), 0 == unicast(Client does have IP address)
+        strb r1, [r0, #10]  
 
-    mov r1, #0          // ciaddr - Client IP address(none)
-    strb r1, [r0, #12]  
+        mov r1, #0          // ciaddr - Client IP address(none)
+        strb r1, [r0, #12]  
 
-    mov r1, #0          // yiaddr - By SERVER offered IP ADDRESS(none)
-    strb r1, [r0, #16]  
+        mov r1, #0          // yiaddr - By SERVER offered IP ADDRESS(none)
+        strb r1, [r0, #16]  
 
-    mov r1, r4
-    str r1, [r0, #20]  // siaddr - IP address of the TFTP server
+        mov r1, r4
+        str r1, [r0, #20]  // siaddr - IP address of the TFTP server
 
-    mov r1, #0
-    strb r1, [r0, #24]  // giaddr - IP address of relay agent
+        mov r1, #0
+        strb r1, [r0, #24]  // giaddr - IP address of relay agent
 
-    ldr r1, =mac_buffer
-    str r1, [r0, #28]  // chaddr - MAC address of a client
+        ldr r1, =mac_buffer
+        str r1, [r0, #28]  // chaddr - MAC address of a client
 
-    mov r1, #0
-    strb r1, [r0, #44]  // sname - Optional server host name
+        mov r1, #0
+        strb r1, [r0, #44]  // sname - Optional server host name
 
-    ldr r1, =bootfile_name
-    str r1, [r0, #108]  // file - Boot file name
-//Options are located at offset 236
-    add r0, r0, #236
-    @ ---- MAGIC COOKIE (0x63 0x82 0x53 0x63) ---- @ 
-    movw r1, #0x8253    @ low 16 bits
-    movt r1, #0x6382    @ high 16 bits
-    str r1, [r0], #4
 
-    //  ---- Option 66: TFTP server name
-    
-    
+        //Options are located at offset 236
+        add r0, r0, #236
+        @ ---- MAGIC COOKIE (0x63 0x82 0x53 0x63) ---- @ 
+        movw r1, #0x8253    @ low 16 bits
+        movt r1, #0x6382    @ high 16 bits
+        str r1, [r0], #4
+
+        //  ---- Option 66: TFTP Server Name
+        mov r1, #0x42
+        strb r1, [r0], #1  // Option ID
+
+        mov r1, r11
+        strb r1, [r0], #1  // Length
+
+        ldr r1, =tftp_name
+        mov r2, r11
+
+        COPY_TFTP_NAME:
+            ldrb r3, [r1], #1
+            strb r3, [r0], #1
+            subs r2, r2, #1
+            bne COPY_TFTP_NAME
+
+        // ---- Option 67: Boot File Name
+        mov r1, #0x43
+        strb r1, [r0], #1
+
+        mov r1, #10
+        strb r1, [r0], #1
+
+
+        ldr r1, =bootfile_name
+        mov r2, #10        
+        COPY_BOOTFILE_NAME:
+            ldrb r3, [r1], #1
+            strb r3, [r0], #1
+            subs r2, r2, #1
+            bne COPY_BOOTFILE_NAME
+        
+
+FOOT:
+
+
 END:
     mov r7, #1
     svc #0
