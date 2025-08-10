@@ -4,18 +4,28 @@ sockaddr_in:
     .hword 0x4300   // port number = 67
     .word 0         // sin_addr = INADDR_ANY, 0.0.0.0
     .skip 8         // 8 bytes padding
+
 sockaddr_offer:
     .hword 2
     .hword 0x4400
     .word 0xFFFFFFFF 
     .skip 8
 
+
+
 new_line: .asciz "\n"
+
 bootfile_name: .asciz "pxelinux.0"
+
+sprava: .asciz "Dosiel az na koniec"
+
 interface_name: .asciz "eth0"
+
 ioctl_cmd: .word 0x8915  @ SIOCGIFADDR
+
 src_addr_len: .word 16
 
+socket_fd: .word 0
 .section .bss
 
     tftp_name: .skip 16 
@@ -41,7 +51,16 @@ HEAD:
         mov r2, #0
         mov r7, #281
         svc #0
+        
         mov r6, r0
+
+        mov r0, r6      // SO_BROADCAST
+        mov r1, #1
+        mov r2, #6
+        ldr r3, =1
+        mov r4, #4
+        mov r7, #281
+        SVC #0
 
     GET_IP_ADDRESS:
         INICIALIZATION:
@@ -89,8 +108,7 @@ HEAD:
         add r0, r0, #28
         ldr r1, =mac_buffer
 mov r13, r6
-
-
+    
 BODY:
     IP_TO_ASCII_CONVERSION:
 
@@ -182,13 +200,7 @@ BODY:
             add r11, r11, #1
             bx lr
 
-        SKIP:
-
-        mov r0, #1
-        ldr r1, =tftp_name
-        mov r2, r11         
-        mov r7, #4
-        svc #0
+SKIP:
 
 LEGS:
     GET_DISCOVERY_ATTRIBUTES:
@@ -296,9 +308,28 @@ LEGS:
             subs r2, r2, #1
             bne COPY_BOOTFILE_NAME
         
-
+        mov r1, #0xFF
+        strb r1, [r0], #1
+        
 FOOT:
+    mov r0, r13
+    ldr r1, =dhcp_offer_packet
+    mov r2, #261
+    mov r3, #0
+    ldr r4, =sockaddr_offer
+    mov r5, #16
+    mov r7, #293
+    SVC #0
 
+mov r0, r13
+mov r7, #6
+SVC #0
+
+mov r0, #1
+ldr r1, =sprava
+mov r2, #19
+mov r7, #4
+SVC #0
 
 END:
     mov r7, #1
