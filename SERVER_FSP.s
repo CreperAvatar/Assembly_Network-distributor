@@ -25,7 +25,6 @@ ioctl_cmd: .word 0x8915  @ SIOCGIFADDR
 
 src_addr_len: .word 16
 
-socket_fd: .word 0
 .section .bss
 
     tftp_name: .skip 16 
@@ -59,7 +58,7 @@ HEAD:
         mov r2, #6
         ldr r3, =1
         mov r4, #4
-        mov r7, #281
+        mov r7, #294
         SVC #0
 
     GET_IP_ADDRESS:
@@ -81,7 +80,7 @@ HEAD:
             mov r7, #54                 @ ioctl syscall
             svc #0      
 
-            ldr r0, =ifreq      @ Saves address of buffer ifreq into register r0
+        //   ldr r0, =ifreq      @ Saves address of buffer ifreq into register r0
         // R0 HOLDS THE BINARY VERSION OF eth0 IP ADDRESS.   
 
 
@@ -104,9 +103,7 @@ HEAD:
         mov r7, #292
         svc #0
     
-        ldr r0, =recv_buffer
-        add r0, r0, #28
-        ldr r1, =mac_buffer
+
 mov r13, r6
     
 BODY:
@@ -204,6 +201,7 @@ SKIP:
 
 LEGS:
     GET_DISCOVERY_ATTRIBUTES:
+        mov r0, #0
         mov r8, #0
         ldr r1, =mac_buffer
         ldr r0, =recv_buffer
@@ -218,10 +216,11 @@ LEGS:
         ldr r5, [r0]
 
         add r0, r0, #18 //MAC
-        ldr r6, [r0]
+
 
         GET_BYTE_LOOP:
-            strb r6, [r1, r8]
+            ldrb r6, [r0, r8]        
+            strb r6, [r1, r8] 
             add r8, r8, #1
             cmp r8, #6
             bne GET_BYTE_LOOP
@@ -256,14 +255,23 @@ LEGS:
         mov r1, #0          // yiaddr - By SERVER offered IP ADDRESS(none)
         strb r1, [r0, #16]  
 
-        mov r1, r4
-        str r1, [r0, #20]  // siaddr - IP address of the TFTP server
+        ldr r1, =ifreq
+        add r1, r1, #20
+        ldr r2, [r1]
+        str r2, [r0, #20]  // siaddr - IP address of the TFTP server
 
         mov r1, #0
         strb r1, [r0, #24]  // giaddr - IP address of relay agent
 
         ldr r1, =mac_buffer
-        str r1, [r0, #28]  // chaddr - MAC address of a client
+        add r0, r0, #28
+        mov r8, #0
+        MAC_OFFER_INSERT:
+            ldrb r2, [r1, r8]
+            strb r2, [r0, r8]
+            add r8, r8, #1
+            cmp r8, #6
+            bne MAC_OFFER_INSERT
 
         mov r1, #0
         strb r1, [r0, #44]  // sname - Optional server host name
@@ -314,7 +322,7 @@ LEGS:
 FOOT:
     mov r0, r13
     ldr r1, =dhcp_offer_packet
-    mov r2, #261
+    mov r2, #272
     mov r3, #0
     ldr r4, =sockaddr_offer
     mov r5, #16
