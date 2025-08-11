@@ -24,6 +24,7 @@ interface_name: .asciz "eth0"
 ioctl_cmd: .word 0x8915  @ SIOCGIFADDR
 
 src_addr_len: .word 16
+so_broadcast_value: .word 1
 
 .section .bss
 
@@ -56,7 +57,7 @@ HEAD:
         mov r0, r6      // SO_BROADCAST
         mov r1, #1
         mov r2, #6
-        ldr r3, =1
+        ldr r3, =so_broadcast_value
         mov r4, #4
         mov r7, #294
         SVC #0
@@ -326,7 +327,7 @@ FOOT:
     mov r3, #0
     ldr r4, =sockaddr_offer
     mov r5, #16
-    mov r7, #293
+    mov r7, #290
     SVC #0
 
 mov r0, r13
