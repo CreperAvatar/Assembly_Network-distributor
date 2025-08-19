@@ -54,13 +54,7 @@ HEAD:
         
         mov r6, r0
 
-        mov r0, r6      // SO_BROADCAST
-        mov r1, #1
-        mov r2, #6
-        ldr r3, =so_broadcast_value
-        mov r4, #4
-        mov r7, #294
-        SVC #0
+
 
     GET_IP_ADDRESS:
         INICIALIZATION:
@@ -79,10 +73,7 @@ HEAD:
             mov r1, #0x8915             @ IOCTL command SIOCGIFADDR
             ldr r2, =ifreq              @ struct ifreq buffer
             mov r7, #54                 @ ioctl syscall
-            svc #0      
-
-        //   ldr r0, =ifreq      @ Saves address of buffer ifreq into register r0
-        // R0 HOLDS THE BINARY VERSION OF eth0 IP ADDRESS.   
+            svc #0       
 
 
     LISTEN_LOOP:
@@ -93,17 +84,6 @@ HEAD:
         mov r2, #16             //Size of sockaddr_in structure (16 bytes)
         mov r7, #282            //Number of syscall
         svc #0
-
-        // recvfrom
-        mov r0, r6
-        ldr r1, =recv_buffer
-        mov r2, #1024
-        mov r3, #0
-        ldr r4, =src_addr
-        ldr r5, =src_addr_len
-        mov r7, #292
-        svc #0
-    
 
 mov r13, r6
     
@@ -200,153 +180,16 @@ BODY:
 
 SKIP:
 
-LEGS:
-    GET_DISCOVERY_ATTRIBUTES:
-        mov r0, #0
-        mov r8, #0
-        ldr r1, =mac_buffer
-        ldr r0, =recv_buffer
-
-        add r0, r0, #4  //Transaction ID
-        ldrh r2, [r0]
-
-        add r0, r0, #4  //secs
-        ldrh r3, [r0]
-
-        add r0, r0, #2 //flags
-        ldr r5, [r0]
-
-        add r0, r0, #18 //MAC
-
-
-        GET_BYTE_LOOP:
-            ldrb r6, [r0, r8]        
-            strb r6, [r1, r8] 
-            add r8, r8, #1
-            cmp r8, #6
-            bne GET_BYTE_LOOP
-
-    DHCP_OFFER:
-        ldr r0, =dhcp_offer_packet
-
-        mov r1, #2  // BOOT REPLY
-        strb r1, [r0, #0]
-
-        mov r1, #1
-        strb r1, [r0, #1]
-
-        mov r1, #6
-        strb r1, [r0, #2]
-    
-        mov r1, #0
-        strb r1, [r0, #3]
-
-        mov r1, r2     // Transaction ID must be extracted from DHCP discover packet
-        str r1, [r0, #4]
-
-        mov r1, r3     // Secs - must be extracted from DHCP discover packet
-        strh r1, [r0, #8]
-
-        mov r1, r5          // flags  -  1 == broadcast(Client doesn't have IP address), 0 == unicast(Client does have IP address)
-        strh r1, [r0, #10]  
-
-        mov r1, #0          // ciaddr - Client IP address(none)
-        str r1, [r0, #12]  
-
-        mov r1, #0          // yiaddr - By SERVER offered IP ADDRESS(none)
-        str r1, [r0, #16]  
-
-        ldr r1, =ifreq
-        add r1, r1, #20
-        ldr r2, [r1]
-        str r2, [r0, #20]  // siaddr - IP address of the TFTP server
-
-        mov r1, #0
-        str r1, [r0, #24]  // giaddr - IP address of relay agent
-
-        ldr r1, =mac_buffer
-        add r0, r0, #28
-        mov r8, #0
-        MAC_OFFER_INSERT:
-            ldrb r2, [r1, r8]
-            strb r2, [r0, r8]
-            add r8, r8, #1
-            cmp r8, #6
-            bne MAC_OFFER_INSERT
-
-
-        add r0, r0, #44  // offset possition
-        mov r1, #0  // store value
-        mov r2, #0 // offset counter
-        SNAME_OFFER_INSERT:
-            strb r1, [r0, r2]
-            add r2, r2, #1
-            cmp r2, #64
-            bne SNAME_OFFER_INSERT
-
-
-
-        //Options are located at offset 236
-        add r0, r0, #236
-        @ ---- MAGIC COOKIE (0x63 0x82 0x53 0x63) ---- @ 
-        movw r1, #0x8253    @ low 16 bits
-        movt r1, #0x6382    @ high 16 bits
-        str r1, [r0], #4
-
-        //  ---- Option 66: TFTP Server Name
-        mov r1, #0x42
-        strb r1, [r0], #1  // Option ID
-
-        mov r1, r11
-        strb r1, [r0], #1  // Length
-
-        ldr r1, =tftp_name
-        mov r2, r11
-
-        COPY_TFTP_NAME:
-            ldrb r3, [r1], #1
-            strb r3, [r0], #1
-            subs r2, r2, #1
-            bne COPY_TFTP_NAME
-
-        // ---- Option 67: Boot File Name
-        mov r1, #0x43
-        strb r1, [r0], #1
-
-        mov r1, #10
-        strb r1, [r0], #1
-
-
-        ldr r1, =bootfile_name
-        mov r2, #10        
-        COPY_BOOTFILE_NAME:
-            ldrb r3, [r1], #1
-            strb r3, [r0], #1
-            subs r2, r2, #1
-            bne COPY_BOOTFILE_NAME
-        
-        mov r1, #0xFF
-        strb r1, [r0], #1
-        
-FOOT:
-    mov r0, r13
-    ldr r1, =dhcp_offer_packet
-    mov r2, #272
-    mov r3, #0
-    ldr r4, =sockaddr_offer
-    mov r5, #16
-    mov r7, #290
-    SVC #0
+mov r0, #1
+ldr r1, =tftp_name
+mov r2, #14
+mov r7, #4
+SVC #0
 
 mov r0, r13
 mov r7, #6
 SVC #0
 
-mov r0, #1
-ldr r1, =sprava
-mov r2, #19
-mov r7, #4
-SVC #0
 
 END:
     mov r7, #1
