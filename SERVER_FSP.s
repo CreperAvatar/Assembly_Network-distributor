@@ -208,13 +208,13 @@ LEGS:
         ldr r0, =recv_buffer
 
         add r0, r0, #4  //Transaction ID
-        ldrh r2, [r0]
+        ldr r2, [r0]
 
         add r0, r0, #4  //secs
         ldrh r3, [r0]
 
         add r0, r0, #2 //flags
-        ldr r5, [r0]
+        ldrh r5, [r0]
 
         add r0, r0, #18 //MAC
 
@@ -259,6 +259,7 @@ LEGS:
         ldr r1, =ifreq
         add r1, r1, #20
         ldr r2, [r1]
+        ldr r15, [r2]
         str r2, [r0, #20]  // siaddr - IP address of the TFTP server
 
         mov r1, #0
@@ -286,19 +287,33 @@ LEGS:
 
 
 
-        //Options are located at offset 236
+     
+
+        add r0, r0, #1
+        mov r1, #0xFF
+        strb r1, [r0], #1
+/*    //Options are located at offset 236
+        ldr r0, =dhcp_offer_packet
         add r0, r0, #236
-        @ ---- MAGIC COOKIE (0x63 0x82 0x53 0x63) ---- @ 
-        movw r1, #0x8253    @ low 16 bits
-        movt r1, #0x6382    @ high 16 bits
+        // ---- MAGIC COOKIE (0x63 0x82 0x53 0x63) ---- @ 
+        ldr r1, =0x63825363
         str r1, [r0], #4
 
-        //  ---- Option 66: TFTP Server Name
-        mov r1, #0x42
-        strb r1, [r0], #1  // Option ID
+        //  ---- Option 53: DHCP Message Type
+        mov r1, #0x35
+        strb r1, [r0], #1  // Type
+        mov r1, #1
+        strb r1, [r0], #1   // Length
+        mov r1, #0x02
+        strb r1, [r0], #1   // Value
 
-        mov r1, r11
+        //  ---- Option 54: Server Identifier
+        mov r1, #0x36
+        strb r1, [r0], #1  // Type
+        mov r1, #4
         strb r1, [r0], #1  // Length
+        ldr r1, [r15]
+        str r1, [r0], #4   // Value     
 
         ldr r1, =tftp_name
         mov r2, r11
@@ -318,16 +333,14 @@ LEGS:
 
 
         ldr r1, =bootfile_name
-        mov r2, #10        
+        mov r2, #0        
+
         COPY_BOOTFILE_NAME:
-            ldrb r3, [r1], #1
-            strb r3, [r0], #1
-            subs r2, r2, #1
-            bne COPY_BOOTFILE_NAME
-        
-        mov r1, #0xFF
-        strb r1, [r0], #1
-        
+            ldrb r3, [r1, r2]
+            strb r3, [r0, r2]
+            add r2, r2, #1
+            cmp r2, #10
+            bne COPY_BOOTFILE_NAME */        
 FOOT:
     mov r0, r13
     ldr r1, =dhcp_offer_packet
@@ -335,7 +348,7 @@ FOOT:
     mov r3, #0
     ldr r4, =sockaddr_offer
     mov r5, #16
-    mov r7, #290
+    mov r7, #236
     SVC #0
 
 mov r0, r13
