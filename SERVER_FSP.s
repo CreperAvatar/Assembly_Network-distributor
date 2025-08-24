@@ -29,8 +29,9 @@ so_broadcast_value: .word 1
 .section .bss
 
     tftp_name: .skip 16 
-    recv_buffer: .skip 300
-    dhcp_offer_packet: .skip 300  // Reserve for the entire dhcp offer packet
+    recv_buffer: .skip 576
+    
+    dhcp_offer_packet: .skip 576  // Reserve for the entire dhcp offer packet
 
     src_addr: .skip 16
     
@@ -57,6 +58,7 @@ HEAD:
         mov r0, r6      // SO_BROADCAST
         mov r1, #1
         mov r2, #6
+        ldr r3, =1
         ldr r3, =so_broadcast_value
         mov r4, #4
         mov r7, #294
@@ -119,7 +121,7 @@ BODY:
 
             ldr r0, =ifreq
             add r0, r0, #20
-            ldrb r3, [r0, r8]          
+            ldrb r3, [r0, r8]          @ r1 = oktet
 
             mov r4, r3
             HUNDREDS:
@@ -203,18 +205,15 @@ SKIP:
 LEGS:
     GET_DISCOVERY_ATTRIBUTES:
         mov r0, #0
+        mov r6, #0
         mov r8, #0
         ldr r1, =mac_buffer
         ldr r0, =recv_buffer
 
-        add r0, r0, #4  //Transaction ID
-        ldr r2, [r0]
-
-        add r0, r0, #4  //secs
-        ldrh r3, [r0]
-
-        add r0, r0, #2 //flags
-        ldrh r5, [r0]
+        add r0, r0, #4  
+        ldr r2, [r0], #4    //Transaction ID
+        ldrh r3, [r0], #2   //secs
+        ldr r5, [r0]        //flags
 
         add r0, r0, #18 //MAC
 
@@ -259,7 +258,6 @@ LEGS:
         ldr r1, =ifreq
         add r1, r1, #20
         ldr r2, [r1]
-        ldr r15, [r2]
         str r2, [r0, #20]  // siaddr - IP address of the TFTP server
 
         mov r1, #0
@@ -274,8 +272,15 @@ LEGS:
             add r8, r8, #1
             cmp r8, #6
             bne MAC_OFFER_INSERT
+            MAC_OFFER_ADD_ZEROS:
+                mov r3, #0
+                strb r3, [r0, r8]
+                add r8, r8, #1
+                cmp r8, #16
+                bne MAC_OFFER_ADD_ZEROS
 
-
+       
+        subs r0, r0, #28
         add r0, r0, #44  // offset possition
         mov r1, #0  // store value
         mov r2, #0 // offset counter
@@ -284,15 +289,19 @@ LEGS:
             add r2, r2, #1
             cmp r2, #64
             bne SNAME_OFFER_INSERT
+            
 
+        sub r0, r0, #44
+        add r0, r0, #108
+        mov r1, #0
+        mov r2, #0
+        FILE_OFFER_INSERT:
+            strb r1, [r0, r2]
+            add r2, r2, #1
+            cmp r2, #128
+            bne FILE_OFFER_INSERT
 
-
-     
-
-        add r0, r0, #1
-        mov r1, #0xFF
-        strb r1, [r0], #1
-/*    //Options are located at offset 236
+    //Options are located at offset 236
         ldr r0, =dhcp_offer_packet
         add r0, r0, #236
         // ---- MAGIC COOKIE (0x63 0x82 0x53 0x63) ---- @ 
@@ -328,7 +337,7 @@ LEGS:
         mov r1, #0x43
         strb r1, [r0], #1
 
-        mov r1, #10
+        mov r1, #12
         strb r1, [r0], #1
 
 
@@ -340,7 +349,12 @@ LEGS:
             strb r3, [r0, r2]
             add r2, r2, #1
             cmp r2, #10
-            bne COPY_BOOTFILE_NAME */        
+            bne COPY_BOOTFILE_NAME  
+
+        add r0, r0, #1
+        mov r1, #0xFF
+        strb r1, [r0], #1                 
+        
 FOOT:
     mov r0, r13
     ldr r1, =dhcp_offer_packet
@@ -348,7 +362,7 @@ FOOT:
     mov r3, #0
     ldr r4, =sockaddr_offer
     mov r5, #16
-    mov r7, #236
+    mov r7, #290
     SVC #0
 
 mov r0, r13
