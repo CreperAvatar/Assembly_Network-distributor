@@ -15,6 +15,8 @@ sockaddr_offer:
 
 new_line: .asciz "\n"
 
+Option_60: .asciz "PXEClient"
+
 bootfile_name: .asciz "pxelinux.0"
 
 sprava: .asciz "Dosiel az na koniec"
@@ -209,7 +211,7 @@ LEGS:
         mov r8, #0
         ldr r1, =mac_buffer
         ldr r0, =recv_buffer
-
+a
         add r0, r0, #4  
         ldr r2, [r0], #4    //Transaction ID
         ldrh r3, [r0], #2   //secs
@@ -257,8 +259,8 @@ LEGS:
 
         ldr r1, =ifreq
         add r1, r1, #20
-        ldr r2, [r1]
-        str r2, [r0, #20]  // siaddr - IP address of the TFTP server
+        ldr r4, [r1]
+        str r4, [r0, #20]  // siaddr - IP address of the TFTP server
 
         mov r1, #0
         str r1, [r0, #24]  // giaddr - IP address of relay agent
@@ -293,20 +295,30 @@ LEGS:
 
         sub r0, r0, #44
         add r0, r0, #108
-        mov r1, #0
-        mov r2, #0
+        ldr r2, =bootfile_name
+        mov r3, #0
         FILE_OFFER_INSERT:
-            strb r1, [r0, r2]
-            add r2, r2, #1
-            cmp r2, #128
+            ldrb r1, [r2], #1
+            strb r1, [r0], #1
+            add r3, r3, #1
+            cmp r3, #11
             bne FILE_OFFER_INSERT
+
 
     //Options are located at offset 236
         ldr r0, =dhcp_offer_packet
         add r0, r0, #236
         // ---- MAGIC COOKIE (0x63 0x82 0x53 0x63) ---- @ 
-        ldr r1, =0x63825363
-        str r1, [r0], #4
+        ldrb r1, =0x63
+        strb r1, [r0], #1
+        ldrb r1, =0x82
+        strb r1, [r0], #1
+        ldrb r1, =0x53
+        strb r1, [r0], #1
+        ldrb r1, =0x63
+        strb r1, [r0], #1
+
+        // ---- Option 43: Vendor-Specific-Information 
 
         //  ---- Option 53: DHCP Message Type
         mov r1, #0x35
@@ -321,8 +333,31 @@ LEGS:
         strb r1, [r0], #1  // Type
         mov r1, #4
         strb r1, [r0], #1  // Length
-        ldr r1, [r15]
-        str r1, [r0], #4   // Value     
+        mov r1, r4
+        str r1, [r0], #4   // Value 
+
+        // ---- Option 60: Vendor Class Identifier
+        mov r1, #0x3C
+        strb r1, [r0], #1
+        mov r1, #9
+        strb r1, [r0], #1
+
+        ldr r1, =Option_60
+        mov r3, #0
+        STORE_OPTION_60:
+            ldrb r2, [r1, r3]
+            strb r2, [r0], #1
+            add r3, r3, #1
+            cmp r3, #9
+            bne STORE_OPTION_60
+
+
+        // ---- Option 66: TFTP Server Name(IP address)
+        mov r1, #0x42
+        strb r1, [r0], #1
+
+        mov r1, r11
+        strb r1, [r0], #1
 
         ldr r1, =tftp_name
         mov r2, r11
@@ -337,33 +372,37 @@ LEGS:
         mov r1, #0x43
         strb r1, [r0], #1
 
-        mov r1, #12
+        mov r1, #10
         strb r1, [r0], #1
 
 
         ldr r1, =bootfile_name
         mov r2, #0        
-
-        COPY_BOOTFILE_NAME:
-            ldrb r3, [r1, r2]
-            strb r3, [r0, r2]
+        mov r3, #0
+        COPY_BOOTFILE_NAME_BETA:
+            ldrb r3, [r1], #1
+            strb r3, [r0], #1
             add r2, r2, #1
             cmp r2, #10
-            bne COPY_BOOTFILE_NAME  
+            bne COPY_BOOTFILE_NAME_BETA  
 
-        add r0, r0, #1
         mov r1, #0xFF
-        strb r1, [r0], #1                 
-        
+        strb r1, [r0]                 
+
+mov r6, #0  
 FOOT:
-    mov r0, r13
-    ldr r1, =dhcp_offer_packet
-    mov r2, #272
-    mov r3, #0
-    ldr r4, =sockaddr_offer
-    mov r5, #16
-    mov r7, #290
-    SVC #0
+
+        mov r0, r13
+        ldr r1, =dhcp_offer_packet
+        mov r2, #350
+        mov r3, #0
+        ldr r4, =sockaddr_offer
+        mov r5, #16
+        mov r7, #290
+        SVC #0
+        add r6, r6, #1
+        cmp r6, #10
+        bne FOOT
 
 mov r0, r13
 mov r7, #6
