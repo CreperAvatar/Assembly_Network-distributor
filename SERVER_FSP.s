@@ -42,6 +42,7 @@ so_broadcast_value: .word 1
     ip_octet: .skip 4
     ip_addr: .skip 4          @ Buffer for IP address
     ifreq: .skip 32            @ struct ifreq buffer
+    uuid_buffer: .skip 17
 
 .section .text
 .global _start
@@ -211,7 +212,7 @@ LEGS:
         mov r8, #0
         ldr r1, =mac_buffer
         ldr r0, =recv_buffer
-a
+
         add r0, r0, #4  
         ldr r2, [r0], #4    //Transaction ID
         ldrh r3, [r0], #2   //secs
@@ -226,6 +227,18 @@ a
             add r8, r8, #1
             cmp r8, #6
             bne GET_BYTE_LOOP
+
+        mov r6, #0
+        mov r8, #0
+        ldr r0, =recv_buffer
+        ldr r1, =uuid_buffer
+        add r0, r0, #238
+        GET_UUID_LOOP:
+            ldrb r6, [r0], #1
+            strb r6, [r1], #1
+            add r8, r8, #1
+            cmp r8, #17
+            bne GET_UUID_LOOP
 
     DHCP_OFFER:
         ldr r0, =dhcp_offer_packet
@@ -284,12 +297,13 @@ a
        
         subs r0, r0, #28
         add r0, r0, #44  // offset possition
-        mov r1, #0  // store value
         mov r2, #0 // offset counter
+        ldr r3, =tftp_name
         SNAME_OFFER_INSERT:
+            ldrb r1, [r3, r2]
             strb r1, [r0, r2]
             add r2, r2, #1
-            cmp r2, #64
+            cmp r2, r11
             bne SNAME_OFFER_INSERT
             
 
@@ -318,8 +332,6 @@ a
         ldrb r1, =0x63
         strb r1, [r0], #1
 
-        // ---- Option 43: Vendor-Specific-Information 
-
         //  ---- Option 53: DHCP Message Type
         mov r1, #0x35
         strb r1, [r0], #1  // Type
@@ -336,6 +348,23 @@ a
         mov r1, r4
         str r1, [r0], #4   // Value 
 
+        // ---- Option 97: Client Machine Identifier
+        mov r2, #0
+        mov r3, #0
+        mov r1, #0x61
+        strb r1, [r0], #1
+        mov r1, #17
+        strb r1, [r0], #1
+        ldr r1, =uuid_buffer
+        STORE_UUID:
+            ldrb r2, [r1], #1
+            strb r2, [r0], #1
+            add r3, r3, #1
+            cmp r3, #17
+            bne STORE_UUID
+
+
+
         // ---- Option 60: Vendor Class Identifier
         mov r1, #0x3C
         strb r1, [r0], #1
@@ -351,40 +380,30 @@ a
             cmp r3, #9
             bne STORE_OPTION_60
 
-
-        // ---- Option 66: TFTP Server Name(IP address)
-        mov r1, #0x42
+        // ---- Option 43: Vendor Options
+        mov r1, #0x2B
         strb r1, [r0], #1
-
-        mov r1, r11
-        strb r1, [r0], #1
-
-        ldr r1, =tftp_name
-        mov r2, r11
-
-        COPY_TFTP_NAME:
-            ldrb r3, [r1], #1
-            strb r3, [r0], #1
-            subs r2, r2, #1
-            bne COPY_TFTP_NAME
-
-        // ---- Option 67: Boot File Name
-        mov r1, #0x43
-        strb r1, [r0], #1
-
         mov r1, #10
         strb r1, [r0], #1
 
+            mov r1, #0x06
+            strb r1, [r0], #1
+            mov r1, #1
+            strb r1, [r0], #1
+            mov r1, #0xD0
+            strb r1, [r0], #1
 
-        ldr r1, =bootfile_name
-        mov r2, #0        
-        mov r3, #0
-        COPY_BOOTFILE_NAME_BETA:
-            ldrb r3, [r1], #1
-            strb r3, [r0], #1
-            add r2, r2, #1
-            cmp r2, #10
-            bne COPY_BOOTFILE_NAME_BETA  
+            mov r1, #0x08
+            strb r1, [r0], #1
+            mov r1, #3
+            strb r1, [r0], #1
+            mov r1, #0x00
+            strb r1, [r0], #1
+            mov r1, #0x00
+            strb r1, [r0], #1
+            mov r1, #0x00
+            strb r1, [r0], #1
+
 
         mov r1, #0xFF
         strb r1, [r0]                 
