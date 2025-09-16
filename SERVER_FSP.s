@@ -90,8 +90,10 @@ HEAD:
         // R0 HOLDS THE BINARY VERSION OF eth0 IP ADDRESS.   
 
 
+
     LISTEN_LOOP:
 
+        BIND_SOCKET:
         // Bind socket
         mov r0, r6              //File descriptor of socket
         ldr r1, =sockaddr_in    //Pointer to address of structure sockaddr_in
@@ -99,6 +101,7 @@ HEAD:
         mov r7, #282            //Number of syscall
         svc #0
 
+        RECV_FROM:
         // recvfrom
         mov r0, r6
         ldr r1, =recv_buffer
@@ -206,7 +209,20 @@ BODY:
 SKIP:
 
 LEGS:
-    GET_DISCOVERY_ATTRIBUTES:
+        mov r0, #0
+        mov r1, #0
+        mov r2, #0
+        mov r3, #0
+        mov r4, #0
+        mov r5, #0
+        mov r6, #0
+    
+
+    GET_DISCOVER_ATTRIBUTES:
+        mov r1, #0
+        mov r2, #0
+        mov r3, #0
+        mov r4, #0
         mov r0, #0
         mov r6, #0
         mov r8, #0
@@ -232,7 +248,8 @@ LEGS:
         mov r8, #0
         ldr r0, =recv_buffer
         ldr r1, =uuid_buffer
-        add r0, r0, #238
+        add r0, r0, #255
+	    add r0, r0, #20
         GET_UUID_LOOP:
             ldrb r6, [r0], #1
             strb r6, [r1], #1
@@ -315,7 +332,7 @@ LEGS:
             ldrb r1, [r2], #1
             strb r1, [r0], #1
             add r3, r3, #1
-            cmp r3, #11
+            cmp r3, #10
             bne FILE_OFFER_INSERT
 
 
@@ -379,18 +396,28 @@ LEGS:
             add r3, r3, #1
             cmp r3, #9
             bne STORE_OPTION_60
+        
+        // ---- Option 13: Boot File Size
+/*         mov r1, #0x0d
+        strb r1, [r0], #1
+        mov r1, #2
+        strb r1, [r0], #1
+        mov r1, #11
+        strb r1, [r0], #1
+        mov r1, #12
+        strb r1, [r0], #1 */
 
         // ---- Option 43: Vendor Options
         mov r1, #0x2B
         strb r1, [r0], #1
-        mov r1, #10
+        mov r1, #8
         strb r1, [r0], #1
 
             mov r1, #0x06
             strb r1, [r0], #1
             mov r1, #1
             strb r1, [r0], #1
-            mov r1, #0xD0
+            mov r1, #0xB
             strb r1, [r0], #1
 
             mov r1, #0x08
@@ -404,6 +431,45 @@ LEGS:
             mov r1, #0x00
             strb r1, [r0], #1
 
+
+        // ---- Option 66: TFTP Server Name(IP address)
+        mov r1, #0x42
+        strb r1, [r0], #1
+
+        mov r1, r11
+        strb r1, [r0], #1
+
+        ldr r1, =tftp_name
+        mov r2, r11
+
+        COPY_TFTP_NAME:
+            ldrb r3, [r1], #1
+            strb r3, [r0], #1
+            subs r2, r2, #1
+            bne COPY_TFTP_NAME
+
+        // ---- Option 67: Boot File Name
+        mov r1, #0x43
+        strb r1, [r0], #1
+
+        //mov r1, #12
+        mov r1, #10
+        strb r1, [r0], #1
+
+
+        ldr r1, =bootfile_name
+        mov r2, #0        
+
+        COPY_BOOTFILE_NAME:
+            ldrb r3, [r1, r2]
+            strb r3, [r0, r2]
+        mov r3, #0
+        COPY_BOOTFILE_NAME_BETA:
+            ldrb r3, [r1], #1
+            strb r3, [r0], #1
+            add r2, r2, #1
+            cmp r2, #10  
+            bne COPY_BOOTFILE_NAME_BETA   
 
         mov r1, #0xFF
         strb r1, [r0]                 
@@ -419,13 +485,11 @@ FOOT:
         mov r5, #16
         mov r7, #290
         SVC #0
-        add r6, r6, #1
-        cmp r6, #10
-        bne FOOT
 
-mov r0, r13
-mov r7, #6
-SVC #0
+        mov r0, r13
+        mov r7, #6
+        SVC #0
+        b HEAD 
 
 mov r0, #1
 ldr r1, =sprava
