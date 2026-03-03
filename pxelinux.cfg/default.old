@@ -1,0 +1,10 @@
+default Alpine Linux
+prompt 1
+timeout 15
+
+label Alpine Linux
+  menu label Alpine Linux (x86_64)
+  kernel boot/vmlinuz-virt
+  initrd boot/initramfs-virt
+  APPEND ip=dhcp
+
